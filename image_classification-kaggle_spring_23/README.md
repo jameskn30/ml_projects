@@ -1,0 +1,1 @@
+Link to competition: https://www.kaggle.com/competitions/data-analytics-spring-2023-image-classification/data
