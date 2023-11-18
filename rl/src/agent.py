@@ -63,6 +63,8 @@ class QLearningAgent():
         print("=" * 20)
         print("TRAINING")
         print("=" * 20)
+        reached_goal_count = 0
+        termination_count = 0
 
         for ep in loop:
             epsilon = self.min_epsilon + (self.max_epsilon - self.min_epsilon) * np.exp(-self.decay_rate * ep)
@@ -71,17 +73,22 @@ class QLearningAgent():
 
             for step in range(self.max_steps):
                 action = self._epsilon_greedy_policy(state, epsilon)
-                new_state, reward, done, info = self.env.step(action)
+                new_state, reward, done, terminated, info = self.env.step(action)
 
                 self.qtable[state][action] = self.qtable[state][action] + \
-                    self.learning_rate * (reward  + self.gamma * np.max(self.qtable[new_state]) - self.qtable[state][action])
+                    self.learning_rate * (reward  + self.gamma * \
+                                          np.max(self.qtable[new_state]) - self.qtable[state][action])
                 
                 state = new_state
 
-                if done:
+                if terminated:
+                    termination_count += 1
+                    break
+                elif done:
+                    reached_goal_count += 1
                     break
             
-            loop.set_description(f"ep = {ep}, eposilon = {epsilon:.2f}")
+            loop.set_description(f"ep = {ep}, eposilon = {epsilon:.2f}, reached goals = {reached_goal_count}, terminated = {termination_count}")
     
     def get_action(self, state):
         return np.argmax(self.qtable[state])

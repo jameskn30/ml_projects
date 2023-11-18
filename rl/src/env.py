@@ -15,23 +15,36 @@ def default_map():
 def GET_MAP(map):
     if map == "4x4": 
         return [
-            "SFFF",
-            "FHFH",
-            "FFFH",
-            "HFFG"
+            "A---",
+            "--S-",
+            "B---",
+            "R--G"
         ]
 
     if map == "8x8": 
         return [
-            "SFFFFFFF",
-            "FFFFFFFF",
-            "FFFHFFFF",
-            "FFFFFHFF",
-            "FFFHFFFF",
-            "FHHFFFHF",
-            "FHFFHFHF",
-            "FFFHFFFG",
+            "A-------",
+            "--------",
+            "---R----",
+            "------S-",
+            "----S---",
+            "R---B---",
+            "-B----S-",
+            "--B--S-G",
         ],
+
+def GET_RANDOM_MAP(rows, cols):
+    def gen_obj():
+        choices = ['R', 'S', 'B', '-']
+        weights =  [0.05, 0.05, 0.05, 0.85]
+        return np.random.choice(choices, p = weights)
+
+    map = [[gen_obj() for _ in range(rows)] for _ in range(cols)]
+    map[0][0] = 'A'
+    map[rows - 1][cols - 1] = 'G'
+
+    map = [''.join(row) for row in map]
+    return map
 
 class GridWorldEnv(gym.Env):
     def __init__(self, map, reward_dict, **kwargs):
@@ -67,9 +80,8 @@ class GridWorldEnv(gym.Env):
 
         #termination status
         self.terminated = False
-
-        #render using pygame
-        self.renderer = GridWorldRenderer(rows, cols)
+        #done status
+        self.done = False
     
     #Reset environmentj
     def reset(self):
@@ -77,6 +89,9 @@ class GridWorldEnv(gym.Env):
         self.goal_pos = [self.rows - 1, self.cols - 1]
         self.set_state(self.agent_pos, self.goal_pos)
         self.timestep = 0
+        self.terminated = False
+        self.done = False
+        
         return 0
 
     def _process_map(self, map_data):
@@ -103,6 +118,9 @@ class GridWorldEnv(gym.Env):
     
     def get_reward(self, pos):
         x,y = pos
+        #agent is penalized for out of bound
+        if x < 0 or x == self.cols or y < 0 or y == self.rows:
+            return self.reward_dict['out-of-bound']
         val = self.map[x][y]
         return self.reward_dict[val] if val in self.reward_dict else 0
 
@@ -112,26 +130,29 @@ class GridWorldEnv(gym.Env):
         Take a step in this environemnt
         @params:
             action: int
-                0: down
-                1:up 
-                2:right
-                3:left
+                0:  up 
+                1:  right 
+                2:  down 
+                3:  left
         @return
             new_state: int
             reward: int
+            done: boolean
             terminated: boolean
             info: dict
-
         """
 
         if action == 0: 
-            self.agent_pos[0] += 1
-        elif action == 1: 
             self.agent_pos[0] -= 1
-        elif action == 2: 
+        elif action == 1: 
             self.agent_pos[1] += 1
+        elif action == 2: 
+            self.agent_pos[0] += 1
         elif action == 3: 
             self.agent_pos[1] -= 1
+
+        #Define your reward function
+        reward = self.get_reward(self.agent_pos)
 
         #clip the agent position to avoid out of bound
         self.agent_pos[0] = np.clip(self.agent_pos[0], 0, self.cols - 1)
@@ -142,40 +163,69 @@ class GridWorldEnv(gym.Env):
 
         #Check if the agent takes too long to go to goal
         self.timestep += 1
-        self.terminated = True if self.timestep > self.max_timestep else False
-
-        #Define your reward function
-        reward = self.get_reward(self.agent_pos)
-
-        if np.array_equal(self.agent_pos, self.goal_pos):
+        if self.timestep > self.max_timestep:
             self.terminated = True
-            reward = 1
+            reward = self.reward_dict['terminated']
         
         if self.reached_goal(self.agent_pos):
-            self.terminated = True
+            self.done = True
+            reward = self.reward_dict['G']
         
         info = {}
         #return:
         #next state, argmax to get the new state of agent, np.argmax([0,0,1,0,0,0,0.5]) = 2
         #reward
         #done or not
+        #terminated for exceeding time steps or not
         #extra infomation
-        return np.argmax(observation), reward, self.terminated, info
+        return np.argmax(observation), reward, self.done, self.terminated, info
     
-    def render(self, agent: QLearningAgent) -> None:
-        #Put a renderer here
+    def render_simple(self, agent: QLearningAgent):
+        max_iter = 20 
+        iter =0 
+        print('=' * 20)
+        print('MAP')
         self.reset()
-        self.renderer.start(self.state)
+        for row in self.map:
+            print(row)
+        print('=' * 20)
+        state = 0
+        while iter < max_iter:
+            iter += 1
+            action = agent.get_action(state)
+            state,reward,done,terminated,info = self.step(action)
+            if done or terminated:
+                break
+            print('took action = ', action, ' to state ', state, 'done =', done)
+            print(self.state)
+            print('=' * 20)
+            time.sleep(0.5)
+        
+        print(f'done = {done}, terminated = {terminated}')
+
+    
+    def render(self, agent: QLearningAgent, debug:bool = False) -> None:
+        #Put a renderer here
+        #render using pygame
+        self.renderer = GridWorldRenderer(self.rows, self.cols, map = self.map)
+        self.reset()
         self.renderer.update(self.state)
-        max_iter = 100
+        pygame.time.wait(1000)
+        max_iter = 20
         iter =0 
         curr_state = 0
-        while self.terminated == False and iter < max_iter:
+        while iter < max_iter:
             observation = self.state.flatten()
             curr_state = np.argmax(observation)
             action = agent.get_action(curr_state)
-            curr_state, _,_,_ = self.step(action)
+            curr_state, reward,done,terminated,info = self.step(action)
             self.renderer.update(self.state)
+            if debug:
+                print(f'curr_state = {curr_state}, took action ={action}')
+            
+            if done or terminated:
+                break
+
             pygame.time.wait(500)
             iter += 1
 
@@ -251,32 +301,11 @@ class GridWorldRenderer():
         self.rock =     self._resolve_path('assets/rock.png') 
         self.shit =     self._resolve_path('assets/shit.png') 
 
-    # def _drawgrid(self):
-    #     for i, x in enumerate(range(0, self._window_width, self.cell_size)):
-    #         for j, y in enumerate(range(0, self._window_height, self.cell_size)):
-    #             color = colors['white']
-
-    #             rect = pygame.Rect(x,y, self.cell_size, self.cell_size)
-
-    #             pygame.draw.rect(self.screen, color, rect)
-    #             if self.test_image and i == 0 and j == 0 :
-    #                 self.draw_robot(self.screen, x,y)
-    #             if i == 1 and j == 0 :
-    #                 self.draw_battery(self.screen, x,y)
-    #             if i == 0 and j == 1 :
-    #                 self.draw_crap(self.screen, x,y)
-
-    #             border = pygame.Rect(x,y, self.cell_size, self.cell_size)
-    #             pygame.draw.rect(self.screen, self.border_color, border, 1)
-
     def _drawstate(self):
         self.screen.fill(colors["grass"])
-        for i, x in enumerate(range(0, self._window_width, self.cell_size)):
-            for j, y in enumerate(range(0, self._window_height, self.cell_size)):
-                if self.map[i][j] == 'A':
-                    self.draw_agent(self.screen, x,y)
-                    
-                elif self.map[i][j] == 'G':
+        for i, y in enumerate(range(0, self._window_height, self.cell_size)):
+            for j, x in enumerate(range(0, self._window_width, self.cell_size)):
+                if self.map[i][j] == 'G':
                     self.draw_coin(self.screen, x,y)
 
                 elif self.map[i][j] == 'R':
@@ -287,9 +316,11 @@ class GridWorldRenderer():
 
                 elif self.map[i][j] == 'S':
                     self.draw_shit(self.screen, x,y)
-
                 else:
                     self.draw_grass(self.screen, x,y)
+                
+                if self.state[i][j] == 1:
+                    self.draw_agent(self.screen, x,y)
 
     def _draw_object(self, screen, img, x,y):
         img = pygame.image.load(img)
