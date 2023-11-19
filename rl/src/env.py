@@ -8,6 +8,7 @@ import pygame
 import time
 import sys
 import os
+# from collections import set
 
 def default_map():
     return 'SFFH\nH'
@@ -66,6 +67,10 @@ class GridWorldEnv(gym.Env):
         #save reward dict
         self.reward_dict = reward_dict
 
+        #discount factor
+        self.DISCOUNT_FACTOR = 0.9
+        self.discounted_cum_reward = 0 
+
         #default state
         self.state = np.zeros((self.rows, self.cols))
         self.set_state(self.agent_pos, self.goal_pos)
@@ -82,6 +87,10 @@ class GridWorldEnv(gym.Env):
         self.terminated = False
         #done status
         self.done = False
+
+        #known path
+        self.visited_state = set()
+
     
     #Reset environmentj
     def reset(self):
@@ -91,6 +100,7 @@ class GridWorldEnv(gym.Env):
         self.timestep = 0
         self.terminated = False
         self.done = False
+        self.visited_state = set()
         
         return 0
 
@@ -118,11 +128,22 @@ class GridWorldEnv(gym.Env):
     
     def get_reward(self, pos):
         x,y = pos
+
         #agent is penalized for out of bound
         if x < 0 or x == self.cols or y < 0 or y == self.rows:
-            return self.reward_dict['out-of-bound']
+            return self.reward_dict['out_of_bound']
+        
+        if (x,y) in self.visited_state:
+            return self.reward_dict['visited_state']
+
+        self.visited_state.add((x,y))
         val = self.map[x][y]
-        return self.reward_dict[val] if val in self.reward_dict else 0
+
+        instant_reward = self.reward_dict[val] if val in self.reward_dict else 0
+        #discounted cummilative reward
+        self.discounted_cum_reward += instant_reward * (self.DISCOUNT_FACTOR ** self.timestep)
+        # return self.discounted_cum_reward if instant_reward != 0 else 0
+        return instant_reward
 
     #Step function: agent take step in env
     def step(self, action):
@@ -181,6 +202,13 @@ class GridWorldEnv(gym.Env):
         return np.argmax(observation), reward, self.done, self.terminated, info
     
     def render_simple(self, agent: QLearningAgent):
+        actions = {
+            0: 'up',
+            1: 'right',
+            2: 'down',
+            3: 'left',
+        }
+        #if agent takes too long to complete, terminate
         max_iter = 20 
         iter =0 
         print('=' * 20)
@@ -190,19 +218,19 @@ class GridWorldEnv(gym.Env):
             print(row)
         print('=' * 20)
         state = 0
+        print(self.state)
         while iter < max_iter:
             iter += 1
             action = agent.get_action(state)
             state,reward,done,terminated,info = self.step(action)
-            if done or terminated:
-                break
-            print('took action = ', action, ' to state ', state, 'done =', done)
+            print(f'took action = {action}({actions[action]}) to state {state} done = {done}, terminated = {terminated}')
             print(self.state)
             print('=' * 20)
+            if done or terminated:
+                break
             time.sleep(0.5)
+        print("exit")
         
-        print(f'done = {done}, terminated = {terminated}')
-
     
     def render(self, agent: QLearningAgent, debug:bool = False) -> None:
         #Put a renderer here
@@ -255,6 +283,8 @@ class GridWorldEnv(gym.Env):
         print(f'goal position = {self.goal_pos}')
         print(f'terminated = {self.terminated}')
         return ''
+
+#  Visual Render using Pygame
 
 colors = {
     "black": (0,0,0),
@@ -363,13 +393,14 @@ class GridWorldRenderer():
         
     def end(self):
         print('exit')
+        pygame.display.quit()
         pygame.quit()
-        sys.exit()
+        sys.exit(1)
 
     
     #call a while  loop to update pygame drawing
-    def run(self):
-        default_state = np.zeros((self.rows, self.columns))
-        default_state[(0,0)] = 1
-        while True:
-            self.update(default_state)
+    # def run(self):
+    #     default_state = np.zeros((self.rows, self.columns))
+    #     default_state[(0,0)] = 1
+    #     while True:
+    #         self.update(default_state)
