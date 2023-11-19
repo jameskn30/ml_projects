@@ -67,10 +67,6 @@ class GridWorldEnv(gym.Env):
         #save reward dict
         self.reward_dict = reward_dict
 
-        #discount factor
-        self.DISCOUNT_FACTOR = 0.9
-        self.discounted_cum_reward = 0 
-
         #default state
         self.state = np.zeros((self.rows, self.cols))
         self.set_state(self.agent_pos, self.goal_pos)
@@ -81,7 +77,7 @@ class GridWorldEnv(gym.Env):
         #time step used to track how long this agent performing
         #if it's to long, terminate early
         self.timestep = 0
-        self.max_timestep = int(kwargs['max_timestep']) if kwargs['max_timestep'] != None else 100
+        self.max_timestep = int(self._get(kwargs, 'max_timestep', 100))
 
         #termination status
         self.terminated = False
@@ -90,6 +86,10 @@ class GridWorldEnv(gym.Env):
 
         #known path
         self.visited_state = set()
+    
+    def _get(self, dict, key, default):
+        return dict[key] if key in dict != None else default
+
 
     
     #Reset environmentj
@@ -140,9 +140,6 @@ class GridWorldEnv(gym.Env):
         val = self.map[x][y]
 
         instant_reward = self.reward_dict[val] if val in self.reward_dict else 0
-        #discounted cummilative reward
-        self.discounted_cum_reward += instant_reward * (self.DISCOUNT_FACTOR ** self.timestep)
-        # return self.discounted_cum_reward if instant_reward != 0 else 0
         return instant_reward
 
     #Step function: agent take step in env
