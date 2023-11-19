@@ -3,7 +3,7 @@ from gymnasium import spaces
 import numpy as np
 from tqdm import tqdm 
 import random
-from .agent import QLearningAgent
+from .agent import QLearningAgent, SarsaAgent
 import pygame
 import time
 import sys
@@ -77,7 +77,7 @@ class GridWorldEnv(gym.Env):
         #time step used to track how long this agent performing
         #if it's to long, terminate early
         self.timestep = 0
-        self.max_timestep = int(self._get(kwargs, 'max_timestep', 100))
+        self.max_timestep = int(self._get(kwargs, 'max_timestep', (self.rows * self.cols) // 2))
 
         #termination status
         self.terminated = False
@@ -236,7 +236,7 @@ class GridWorldEnv(gym.Env):
         self.reset()
         self.renderer.update(self.state)
         pygame.time.wait(1000)
-        max_iter = 20
+        max_iter = self.rows * self.cols
         iter =0 
         curr_state = 0
         while iter < max_iter:
@@ -392,7 +392,7 @@ class GridWorldRenderer():
         print('exit')
         pygame.display.quit()
         pygame.quit()
-        sys.exit(1)
+        # sys.exit(1)
 
     
     #call a while  loop to update pygame drawing
