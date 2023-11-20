@@ -3,9 +3,11 @@ from gymnasium import spaces
 import numpy as np
 from tqdm import tqdm 
 import random
+import os
+import json
+import uuid
 
 class QLearningAgent():
-
     def __init__(self, env, **kwargs: dict) -> None:
         self.n_training_eps = int(self._get(kwargs, "n_training_eps", 10000))
         self.n_eval_eps = int(self._get(kwargs, "n_eval_eps", 100))
@@ -92,14 +94,42 @@ class QLearningAgent():
     
     def get_action(self, state):
         return np.argmax(self.qtable[state])
-    
-    def save(self, path = 'qtable.npy'):
-        with open(path, 'wb') as file:
-            np.save(file, self.qtable)
+   
+    def save_attempt(self, id = None):
+        if id == None:
+            id = str(uuid.uuid4()).split('-')[0]
+        attemp_dir = f'./attempts/{id}'
+        map = self.env.map
+        qtable = self.qtable
 
-    def load(self, path = 'qtable.npy'):
-        with open(path, 'rb') as file:
-            self.qtable = np.load(file)
+        if os.path.exists(attemp_dir) == False:
+            os.path.join(attemp_dir, f'attemp_{1}')
+            os.makedirs(attemp_dir)
+        map_path = os.path.join(attemp_dir,'map.json')
+        with open(map_path, 'w') as mapfile:
+            json.dump(map, mapfile)
+        
+        qtable_path = os.path.join(attemp_dir,'qtable.npy')
+        with open(qtable_path, 'wb') as qtablefile:
+            np.save(qtablefile, qtable)
+        return id
+
+    def load_attempt(self, id):
+        attemp_dir = f'./attempts/{id}'
+        if os.path.exists(attemp_dir):
+            map_path = os.path.join(attemp_dir,'map.json')
+            with open(map_path, 'rb') as mapfile:
+                map = json.load(mapfile)
+                self.env.map = map
+            
+            qtable_path = os.path.join(attemp_dir,'qtable.npy')
+            with open(qtable_path, 'rb') as qtablefile:
+                qtable = np.load(qtablefile)
+                self.qtable = qtable
+            
+            return map, qtable
+        else:
+            raise FileNotFoundError(f"{attemp_dir} directory not found") 
 
 
 class SarsaAgent():
@@ -200,3 +230,37 @@ class SarsaAgent():
     def load(self, path = 'qtable.npy'):
         with open(path, 'rb') as file:
             self.qtable = np.load(file)
+
+    def save_attempt(self, id = None):
+        if id == None:
+            id = str(uuid.uuid4()).split('-')[0]
+        attemp_dir = f'./attempts/{id}'
+        map = self.env.map
+        qtable = self.qtable
+
+        if os.path.exists(attemp_dir) == False:
+            os.path.join(attemp_dir, f'attemp_{1}')
+            os.makedirs(attemp_dir)
+        map_path = os.path.join(attemp_dir,'map.json')
+        with open(map_path, 'w') as mapfile:
+            json.dump(map, mapfile)
+        
+        qtable_path = os.path.join(attemp_dir,'qtable.npy')
+        with open(qtable_path, 'wb') as qtablefile:
+            np.save(qtablefile, qtable)
+        return id
+
+    def load_attempt(self, id):
+        attemp_dir = f'./attempts/{id}'
+        if os.path.exists(attemp_dir):
+            map_path = os.path.join(attemp_dir,'map.json')
+            with open(map_path, 'rb') as mapfile:
+                map = json.load(mapfile)
+            
+            qtable_path = os.path.join(attemp_dir,'qtable.npy')
+            with open(qtable_path, 'rb') as qtablefile:
+                qtable = np.load(qtablefile)
+            
+            return map, qtable
+        else:
+            raise FileNotFoundError(f"{attemp_dir} directory not found")

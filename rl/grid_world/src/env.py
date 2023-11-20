@@ -8,6 +8,8 @@ import pygame
 import time
 import sys
 import os
+import json
+import uuid
 # from collections import set
 
 GAME_SPEED = 40
@@ -396,9 +398,3 @@ class GridWorldRenderer():
         # sys.exit(1)
 
     
-    #call a while  loop to update pygame drawing
-    # def run(self):
-    #     default_state = np.zeros((self.rows, self.columns))
-    #     default_state[(0,0)] = 1
-    #     while True:
-    #         self.update(default_state)
