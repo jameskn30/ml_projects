@@ -10,6 +10,8 @@ import sys
 import os
 # from collections import set
 
+GAME_SPEED = 40
+
 def default_map():
     return 'SFFH\nH'
 
@@ -239,24 +241,21 @@ class GridWorldEnv(gym.Env):
         max_iter = self.rows * self.cols
         iter =0 
         curr_state = 0
-        while iter < max_iter:
+        done = terminated = False
+        while True:
+            if done or terminated:
+                continue
             observation = self.state.flatten()
             curr_state = np.argmax(observation)
             action = agent.get_action(curr_state)
             curr_state, reward,done,terminated,info = self.step(action)
-            self.renderer.update(self.state)
-            if debug:
-                print(f'curr_state = {curr_state}, took action ={action}')
-            
-            if done or terminated:
+            if self.renderer.update(self.state) == False:
                 break
+            # if debug:
+            #     print(f'curr_state = {curr_state}, took action ={action}')
 
-            pygame.time.wait(500)
+            # pygame.time.wait(500)
             iter += 1
-
-        self.renderer.update(self.state)
-        pygame.time.wait(1000)
-        self.renderer.end()
         print("Terminated")
         
     def __str__(self):
@@ -383,10 +382,12 @@ class GridWorldRenderer():
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.end()
-            
+                return False
 
         self._drawstate()
         pygame.display.update()
+        self.clock.tick(GAME_SPEED)
+        return True
         
     def end(self):
         print('exit')
