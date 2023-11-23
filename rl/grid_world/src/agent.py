@@ -94,6 +94,14 @@ class QLearningAgent():
     
     def get_action(self, state):
         return np.argmax(self.qtable[state])
+       
+    def save(self, path = 'qtable.npy'):
+        with open(path, 'wb') as file:
+            np.save(file, self.qtable)
+
+    def load(self, path = 'qtable.npy'):
+        with open(path, 'rb') as file:
+            self.qtable = np.load(file)
    
     def save_attempt(self, id = None):
         if id == None:
